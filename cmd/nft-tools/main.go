@@ -11,14 +11,20 @@ import (
 )
 
 func main() {
+	// Fetch metadata
 	fetchMetadataCmd := flag.NewFlagSet("fetch-metadata", flag.ExitOnError)
-	fmRpcUrl := fetchMetadataCmd.String("rpc-url", "", "RPC URL for connecting to network")
+	fmRpcHttpUrl := fetchMetadataCmd.String("rpc-http-url", "", "RPC HTTP URL for connecting to network")
 	fmContractAddress := fetchMetadataCmd.String("contract-address", "", "Contract address for collection")
 	fmLowerTokenId := fetchMetadataCmd.Int64("lower-token-id", 0, "Lower token id bound")
 	fmUpperTokenId := fetchMetadataCmd.Int64("upper-token-id", 10000, "Upper token id bound")
 
+	// Monitor tokens
+	monitorTokensCmd := flag.NewFlagSet("monitor-tokens", flag.ExitOnError)
+	mtRpcWsUrl := monitorTokensCmd.String("rpc-ws-url", "", "RPC WS URL for connecting to network")
+
 	cmds := map[string](*flag.FlagSet){
 		fetchMetadataCmd.Name(): fetchMetadataCmd,
+		monitorTokensCmd.Name(): monitorTokensCmd,
 	}
 
 	if len(os.Args) < len(cmds)+1 {
@@ -31,7 +37,9 @@ func main() {
 
 		switch os.Args[1] {
 		case fetchMetadataCmd.Name():
-			scripts.FetchMetadata(*fmRpcUrl, *fmContractAddress, big.NewInt(*fmLowerTokenId), big.NewInt(*fmUpperTokenId))
+			scripts.FetchMetadata(*fmRpcHttpUrl, *fmContractAddress, big.NewInt(*fmLowerTokenId), big.NewInt(*fmUpperTokenId))
+		case monitorTokensCmd.Name():
+			scripts.MonitorTokens(*mtRpcWsUrl)
 		}
 	} else {
 		fmt.Printf("Invalid command")

@@ -35,9 +35,9 @@ type MetadataResponse struct {
 	Metadata string
 }
 
-func FetchMetadata(rpcUrl string, contractAddress string, lowerTokenId *big.Int, upperTokenId *big.Int) {
+func FetchMetadata(rpcHttpUrl string, contractAddress string, lowerTokenId *big.Int, upperTokenId *big.Int) {
 	// Connect to the network
-	client, err := ethclient.Dial(rpcUrl)
+	client, err := ethclient.Dial(rpcHttpUrl)
 	if err != nil {
 		log.Fatalf("Failed to connect to network: %s", err)
 	}
