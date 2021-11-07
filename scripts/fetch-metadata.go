@@ -2,6 +2,7 @@ package scripts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -65,16 +67,36 @@ func FetchMetadata(rpcUrl string, contractAddress string, lowerTokenId *big.Int,
 			defer reqWg.Done()
 
 			for req := range reqChan {
-				fmt.Println("req", req.TokenId)
-				response, err := http.Get(req.TokenUri)
-				if err != nil {
-					fmt.Printf("Failed to fetch metadata for token id %s\n", req.TokenId)
-				}
+				if _, err := os.Stat(fmt.Sprintf("./metadata/%s/%s.json", contractAddress, req.TokenId)); errors.Is(err, os.ErrNotExist) {
+					fmt.Println("req", req.TokenId)
 
-				metadata, _ := ioutil.ReadAll(response.Body)
-				resChan <- MetadataResponse{
-					TokenId:  req.TokenId,
-					Metadata: string(metadata),
+					numRetries := 5
+					for numRetries > 0 {
+						if strings.HasPrefix(req.TokenUri, "ipfs://") {
+							req.TokenUri = fmt.Sprintf("https://gateway.ipfs.io/ipfs/%s", req.TokenUri[7:])
+						}
+
+						if strings.HasPrefix(req.TokenUri, "https://") {
+							response, err := http.Get(req.TokenUri)
+							if err != nil {
+								fmt.Printf("Failed to fetch metadata for token id %s, retrying...\n", req.TokenId)
+								numRetries--
+								time.Sleep(time.Duration((5 - numRetries) * 2 * int(time.Second)))
+								continue
+							}
+
+							metadata, _ := ioutil.ReadAll(response.Body)
+							resChan <- MetadataResponse{
+								TokenId:  req.TokenId,
+								Metadata: string(metadata),
+							}
+							break
+						}
+					}
+
+					if numRetries == 0 {
+						fmt.Printf("Could not fetch metadata for token id %s", req.TokenId)
+					}
 				}
 			}
 		}()
@@ -129,11 +151,9 @@ func FetchMetadata(rpcUrl string, contractAddress string, lowerTokenId *big.Int,
 			for i := 0; i < len(tokenIds); i++ {
 				result, _ := erc721Abi.Unpack("tokenURI", uris[i])
 				uri := result[0].(string)
-				if strings.HasPrefix(uri, "https") {
-					reqChan <- MetadataRequest{
-						TokenId:  tokenIds[i],
-						TokenUri: uri,
-					}
+				reqChan <- MetadataRequest{
+					TokenId:  tokenIds[i],
+					TokenUri: uri,
 				}
 			}
 		}()
